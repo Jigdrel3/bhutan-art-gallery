@@ -60,7 +60,12 @@ const MandalaGate = forwardRef(function MandalaGate({ hover, glowRef, activating
   return (
     <group ref={ref}>
       {/* Glass body — proportioned closer to a gau (portable shrine box)
-          than a plain cube: taller than it is wide, modest depth. */}
+          than a plain cube: taller than it is wide, modest depth. Plain
+          tinted glass, no pattern here — a box's 6 faces don't share a
+          uniform square aspect, so mapping a circular mandala across all
+          of them via shared UVs stretched it into something unrecognizable
+          on the non-square faces. The mandala lives on its own square
+          medallion panel below instead, where it can't distort. */}
       <mesh castShadow>
         <boxGeometry args={[1.7, 2.1, 1.3]} />
         <meshPhysicalMaterial
@@ -69,15 +74,31 @@ const MandalaGate = forwardRef(function MandalaGate({ hover, glowRef, activating
           roughness={0.08}
           ior={1.5}
           thickness={0.6}
-          normalMap={normalMap}
-          normalScale={new THREE.Vector2(0.6, 0.6)}
-          emissiveMap={emissiveMap}
-          emissive={SAFFRON}
-          emissiveIntensity={0.5}
           attenuationColor={GLASS_TINT}
           attenuationDistance={1.2}
           clearcoat={0.4}
           clearcoatRoughness={0.2}
+        />
+      </mesh>
+
+      {/* Mandala medallion — a square glass panel set into the front face,
+          so the etched pattern renders at its true undistorted proportions
+          and is unmistakably a mandala rather than a stretched smear. */}
+      <mesh position={[0, 0, 0.68]}>
+        <planeGeometry args={[1.35, 1.35]} />
+        <meshPhysicalMaterial
+          color={GLASS_TINT}
+          transmission={0.55}
+          roughness={0.06}
+          ior={1.5}
+          thickness={0.25}
+          normalMap={normalMap}
+          normalScale={new THREE.Vector2(1.1, 1.1)}
+          emissiveMap={emissiveMap}
+          emissive={SAFFRON}
+          emissiveIntensity={1.6}
+          toneMapped={false}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
