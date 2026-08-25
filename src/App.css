@@ -1,0 +1,183 @@
+.app-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #050506;
+}
+
+canvas {
+  display: block;
+  outline: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: #cfc9bd;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  text-align: center;
+}
+
+.hint p {
+  margin: 0.25em 0;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.hint-sub {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.loader-text {
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  color: #e0972f;
+}
+
+.category-viewer {
+  pointer-events: auto;
+  background: rgba(5, 5, 6, 0.92);
+  justify-content: space-between;
+  padding: 2.5rem 2rem;
+}
+
+.viewer-header h2 {
+  margin: 0 0 0.4rem;
+  color: #f4f0e6;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-size: 1.6rem;
+}
+
+.viewer-wall-text {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.75;
+  font-size: 0.95rem;
+}
+
+.viewer-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Uniform museum-frame treatment: outer dark wood edge, a thin gold
+   fillet, a warm mat, and a FIXED-size image window so every photo in
+   every category sits inside the same frame regardless of its own
+   aspect ratio (cropped to fill via object-fit: cover). */
+.frame-outer {
+  background: #0a0a0c;
+  padding: 16px;
+  border-radius: 2px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(224, 151, 47, 0.12);
+}
+
+.frame-fillet {
+  background: linear-gradient(135deg, #e9a94a, #b9762a);
+  padding: 3px;
+}
+
+.frame-mat {
+  background: #f4f0e6;
+  padding: 1.25rem;
+}
+
+.frame-image-box {
+  width: min(66vw, 880px);
+  height: min(58vh, 560px);
+  overflow: hidden;
+  background: #000;
+}
+
+.frame-image-box img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewer-nav {
+  pointer-events: auto;
+  background: transparent;
+  border: 1px solid rgba(224, 151, 47, 0.4);
+  color: #e0972f;
+  font-size: 2rem;
+  line-height: 1;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.viewer-nav:hover {
+  background: rgba(224, 151, 47, 0.15);
+}
+
+.viewer-footer {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: system-ui, sans-serif;
+}
+
+.viewer-count {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  letter-spacing: 0.05em;
+}
+
+.back-button {
+  pointer-events: auto;
+  font-family: system-ui, sans-serif;
+  background: transparent;
+  border: 1px solid #e0972f;
+  color: #e0972f;
+  padding: 0.5rem 1.25rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.back-button:hover {
+  background: rgba(224, 151, 47, 0.12);
+}
+
+.statue-overlay {
+  justify-content: space-between;
+  padding: 2.5rem 2rem;
+}
+
+.statue-caption {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.statue-caption p {
+  margin: 0.25em 0;
+}
+
+.statue-hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  font-style: normal;
+}
+
+.statue-back {
+  margin-top: auto;
+}
