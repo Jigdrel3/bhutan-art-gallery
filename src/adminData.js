@@ -95,6 +95,11 @@ export async function uploadImage({ categoryId, categorySlug, file, caption, alt
   return data
 }
 
+export async function updateCategoryWallText(categoryId, wallText) {
+  const { error } = await supabase.from('categories').update({ wall_text: wallText }).eq('id', categoryId)
+  if (error) throw error
+}
+
 export async function setCover(categoryId, image) {
   await supabase.from('images').update({ is_cover: false }).eq('category_id', categoryId)
   await supabase.from('images').update({ is_cover: true }).eq('id', image.id)

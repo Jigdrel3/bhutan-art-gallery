@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { transformedImageUrl } from './lib/imageUrl'
 
 export default function CategoryViewer({ category, onClose }) {
   const [index, setIndex] = useState(0)
@@ -22,6 +23,9 @@ export default function CategoryViewer({ category, onClose }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [goPrev, goNext, onClose])
 
+  const current = category.images[index]
+  const altText = current.altText || current.caption || `${category.title}, image ${index + 1} of ${total}`
+
   return (
     <div className="overlay category-viewer">
       <div className="viewer-header">
@@ -44,9 +48,9 @@ export default function CategoryViewer({ category, onClose }) {
             <div className="frame-mat">
               <div className="frame-image-box">
                 <img
-                  key={category.images[index]}
-                  src={category.images[index]}
-                  alt={`${category.title} ${index + 1} of ${total}`}
+                  key={current.url}
+                  src={transformedImageUrl(current.url, { width: 1400, quality: 82 })}
+                  alt={altText}
                 />
               </div>
             </div>
@@ -67,6 +71,7 @@ export default function CategoryViewer({ category, onClose }) {
         <span className="viewer-count">
           {index + 1} of {total}
         </span>
+        {current.caption && <span className="viewer-caption">{current.caption}</span>}
         <button type="button" className="back-button" onClick={onClose}>
           ← Return to the hall
         </button>

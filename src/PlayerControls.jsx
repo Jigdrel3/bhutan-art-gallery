@@ -12,6 +12,9 @@ function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 const PlayerControls = forwardRef(function PlayerControls({ bounds }, ref) {
   const { camera, gl } = useThree()
   const keys = useRef({ forward: false, back: false, left: false, right: false })
@@ -28,7 +31,7 @@ const PlayerControls = forwardRef(function PlayerControls({ bounds }, ref) {
     approach(targetPosition, targetYaw, targetPitch, duration, onDone) {
       transition.current = {
         t: 0,
-        duration,
+        duration: prefersReducedMotion ? 0.05 : duration,
         fromPos: camera.position.clone(),
         toPos: new THREE.Vector3(...targetPosition),
         fromYaw: yaw.current,
@@ -240,7 +243,7 @@ const PlayerControls = forwardRef(function PlayerControls({ bounds }, ref) {
     if (speed > 0.05) {
       bobTime.current += dt * speed * 3.2
     }
-    const bob = moving ? Math.sin(bobTime.current) * 0.035 : 0
+    const bob = moving && !prefersReducedMotion ? Math.sin(bobTime.current) * 0.035 : 0
     camera.position.y = EYE_HEIGHT + bob
   })
 

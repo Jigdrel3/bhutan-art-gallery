@@ -38,14 +38,24 @@ export default function HallInteractions({ categories, onEnter, disabled }) {
 
   useEffect(() => {
     const canvas = gl.domElement
-    const onClick = () => {
+    const tryEnter = () => {
       if (disabledRef.current) return
       if (document.pointerLockElement !== canvas) return
       const nearest = findNearestCategory(camera.position, categoriesRef.current)
       if (nearest) onEnterRef.current(nearest)
     }
-    canvas.addEventListener('click', onClick)
-    return () => canvas.removeEventListener('click', onClick)
+    // Click is the primary interaction, but Enter/E work too so a category
+    // can be entered without ever touching the mouse once you're locked in
+    // and have walked up to it with WASD.
+    const onKeyDown = (e) => {
+      if (e.code === 'Enter' || e.code === 'KeyE') tryEnter()
+    }
+    canvas.addEventListener('click', tryEnter)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      canvas.removeEventListener('click', tryEnter)
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [camera, gl])
 
   return null

@@ -112,6 +112,49 @@ button.danger:hover:not(:disabled) {
   margin: 0;
 }
 
+.new-category-walltext {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-bottom: 1rem;
+}
+
+.wall-text-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.wall-text-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.wall-text-editor textarea {
+  background: #0c0d10;
+  border: 1px solid #2a2b31;
+  color: #f4f0e6;
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.wall-text-editor textarea:focus {
+  outline: none;
+  border-color: #e0972f;
+}
+
+.wall-text-editor button {
+  align-self: flex-start;
+}
+
 .admin-section {
   background: #15161a;
   border: 1px solid #22232a;

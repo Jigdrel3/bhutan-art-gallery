@@ -140,6 +140,14 @@ canvas {
   letter-spacing: 0.05em;
 }
 
+.viewer-caption {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  opacity: 0.75;
+  margin-right: auto;
+}
+
 .back-button {
   pointer-events: auto;
   font-family: system-ui, sans-serif;

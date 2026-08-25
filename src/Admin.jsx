@@ -8,6 +8,7 @@ import {
   uploadImage,
   setCover,
   updateImageMeta,
+  updateCategoryWallText,
   deleteImage,
 } from './adminData'
 import { slugify } from './lib/slugify'
@@ -133,11 +134,48 @@ function ExistingImageRow({ image, category, categories, onSetCover, onSave, onD
   )
 }
 
+function WallTextEditor({ category, onSave }) {
+  const [text, setText] = useState(category.wall_text || '')
+  const [saving, setSaving] = useState(false)
+  const dirty = text !== (category.wall_text || '')
+
+  useEffect(() => {
+    setText(category.wall_text || '')
+  }, [category.id, category.wall_text])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(category.id, text)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="wall-text-editor">
+      <label>
+        Threshold wall text — the short line shown when someone opens this category
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={2}
+          placeholder="e.g. Some days the only thing that held still was the sky."
+        />
+      </label>
+      <button type="button" disabled={!dirty || saving} onClick={handleSave}>
+        {saving ? 'Saving…' : 'Save wall text'}
+      </button>
+    </div>
+  )
+}
+
 function AdminPanel() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [newCategoryTitle, setNewCategoryTitle] = useState('')
+  const [newCategoryWallText, setNewCategoryWallText] = useState('')
   const [pending, setPending] = useState([]) // { file, caption, altText }
   const [coverIndex, setCoverIndex] = useState(0)
   const [uploading, setUploading] = useState(false)
@@ -184,7 +222,11 @@ function AdminPanel() {
 
       if (newCategoryTitle.trim()) {
         const slug = slugify(newCategoryTitle)
-        const created = await createCategory({ slug, title: newCategoryTitle.trim() })
+        const created = await createCategory({
+          slug,
+          title: newCategoryTitle.trim(),
+          wallText: newCategoryWallText.trim(),
+        })
         categoryId = created.id
         categorySlug = created.slug
       }
@@ -213,6 +255,7 @@ function AdminPanel() {
       setStatus(`Uploaded ${pending.length} image${pending.length > 1 ? 's' : ''}.`)
       clearPending()
       setNewCategoryTitle('')
+      setNewCategoryWallText('')
       setSelectedCategoryId(categoryId)
       await reload()
     } catch (err) {
@@ -230,6 +273,11 @@ function AdminPanel() {
 
   const handleSaveMeta = async (image, patch) => {
     await updateImageMeta(image.id, patch)
+    await reload()
+  }
+
+  const handleSaveWallText = async (categoryId, wallText) => {
+    await updateCategoryWallText(categoryId, wallText)
     await reload()
   }
 
@@ -274,6 +322,18 @@ function AdminPanel() {
             />
           </label>
         </div>
+
+        {newCategoryTitle.trim() && (
+          <label className="new-category-walltext">
+            Wall text for "{newCategoryTitle.trim()}" (optional)
+            <input
+              type="text"
+              placeholder="e.g. Weather as memory — each of these fell only once."
+              value={newCategoryWallText}
+              onChange={(e) => setNewCategoryWallText(e.target.value)}
+            />
+          </label>
+        )}
 
         <div
           className={`dropzone ${dragOver ? 'dropzone-active' : ''}`}
@@ -321,6 +381,13 @@ function AdminPanel() {
 
         {status && <p className="admin-status">{status}</p>}
       </section>
+
+      {selectedCategory && (
+        <section className="admin-section">
+          <h2>Wall text — {selectedCategory.title}</h2>
+          <WallTextEditor category={selectedCategory} onSave={handleSaveWallText} />
+        </section>
+      )}
 
       <section className="admin-section">
         <h2>Manage images{selectedCategory ? ` — ${selectedCategory.title}` : ''}</h2>

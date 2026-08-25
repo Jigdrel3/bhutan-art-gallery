@@ -5,7 +5,7 @@ import { layoutCategories } from './layout'
 async function fetchFromSupabase() {
   const { data, error } = await supabase
     .from('categories')
-    .select('slug, title, wall_text, cover_url, sort_order, images ( url, sort_order )')
+    .select('slug, title, wall_text, cover_url, sort_order, images ( url, caption, alt_text, sort_order )')
     .order('sort_order', { ascending: true })
     .order('sort_order', { ascending: true, foreignTable: 'images' })
 
@@ -16,7 +16,7 @@ async function fetchFromSupabase() {
     title: row.title,
     wallText: row.wall_text,
     cover: row.cover_url,
-    images: row.images.map((img) => img.url),
+    images: row.images.map((img) => ({ url: img.url, caption: img.caption, altText: img.alt_text })),
   }))
 }
 
@@ -34,5 +34,10 @@ export async function fetchCategories() {
       console.warn('Supabase category fetch failed, falling back to local content:', err)
     }
   }
-  return layoutCategories(localCategories)
+  return layoutCategories(
+    localCategories.map((cat) => ({
+      ...cat,
+      images: cat.images.map((url) => ({ url, caption: '', altText: '' })),
+    }))
+  )
 }

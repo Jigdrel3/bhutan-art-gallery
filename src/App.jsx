@@ -1,5 +1,6 @@
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { Loader } from '@react-three/drei'
 import Room from './Room'
 import PlayerControls from './PlayerControls'
 import CategoryFrames from './CategoryFrames'
@@ -7,14 +8,17 @@ import StandingMarkers from './StandingMarkers'
 import HallInteractions, { approachParamsFor } from './HallInteractions'
 import CategoryViewer from './CategoryViewer'
 import Entrance from './Entrance'
+import Fallback2D from './Fallback2D'
 import { fetchCategories } from './dataSource'
 import { HALLWAY_WIDTH, MIN_LENGTH } from './layout'
+import { hasWebGL } from './lib/webgl'
 import './App.css'
 
 const PLAYER_RADIUS = 0.4
 
 export default function App() {
   const [gateOpen, setGateOpen] = useState(false)
+  const [webglOk] = useState(hasWebGL)
   const [locked, setLocked] = useState(false)
   const [entered, setEntered] = useState(null)
   const [transitioning, setTransitioning] = useState(false)
@@ -67,6 +71,10 @@ export default function App() {
     return <Entrance onEnter={() => setGateOpen(true)} />
   }
 
+  if (!webglOk) {
+    return <Fallback2D />
+  }
+
   return (
     <div className="app-root">
       <Canvas
@@ -85,6 +93,14 @@ export default function App() {
         <HallInteractions categories={hall.frames} onEnter={handleEnter} disabled={busy} />
       </Canvas>
 
+      <Loader
+        containerStyles={{ background: '#08080a' }}
+        innerStyles={{ background: '#2a2c3a' }}
+        barStyles={{ background: '#e0972f' }}
+        dataStyles={{ color: '#cfc9bd', fontFamily: 'system-ui, sans-serif', fontSize: '0.8rem' }}
+        dataInterpolation={(p) => `Loading the collection — ${p.toFixed(0)}%`}
+      />
+
       {loadingCategories && (
         <div className="overlay loader">
           <p className="loader-text">Entering the hall…</p>
@@ -95,7 +111,7 @@ export default function App() {
         <div className="overlay hint">
           <p>Click anywhere to step inside</p>
           <p className="hint-sub">
-            WASD to walk &middot; mouse to look around &middot; stand on a glowing marker and click to enter a room &middot; Esc to step back
+            WASD to walk &middot; mouse to look around &middot; stand on a glowing marker and click (or press E) to enter a room &middot; Esc to step back
           </p>
         </div>
       )}

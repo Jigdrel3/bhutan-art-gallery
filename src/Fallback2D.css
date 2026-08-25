@@ -1,0 +1,87 @@
+.fallback-root {
+  min-height: 100vh;
+  background: #08080a;
+  color: #f4f0e6;
+  font-family: system-ui, sans-serif;
+  padding: 3rem 2rem 4rem;
+}
+
+.fallback-header {
+  max-width: 40rem;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+}
+
+.fallback-header h1 {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 2rem;
+  margin: 0 0 0.6rem;
+  color: #f4f0e6;
+}
+
+.fallback-header p {
+  opacity: 0.65;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.fallback-loading {
+  text-align: center;
+  opacity: 0.6;
+}
+
+.fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+  max-width: 70rem;
+  margin: 0 auto;
+}
+
+.fallback-card {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border: 1px solid rgba(224, 151, 47, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  background: #101114;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.fallback-card:hover,
+.fallback-card:focus-visible {
+  border-color: #e0972f;
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fallback-card:hover,
+  .fallback-card:focus-visible {
+    transform: translateY(-2px);
+  }
+}
+
+.fallback-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fallback-card-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.6rem 0.8rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.85), transparent);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 0.95rem;
+  text-align: left;
+  color: #f4f0e6;
+}

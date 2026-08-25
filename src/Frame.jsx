@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import { INTERACT_RADIUS } from './layout'
+import { transformedImageUrl } from './lib/imageUrl'
 
 const GLOW_RANGE = 3.6
 const FRAME_W = 1.6
@@ -31,7 +32,7 @@ function CornerFlourish({ cx, cy, sx, sy }) {
 }
 
 export default function Frame({ data }) {
-  const texture = useTexture(data.cover)
+  const texture = useTexture(transformedImageUrl(data.cover, { width: 512 }))
   const { gl } = useThree()
   const matRef = useRef(null)
   const plaqueMatRef = useRef(null)

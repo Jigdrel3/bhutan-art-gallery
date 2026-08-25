@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GOLD = '#e0972f'
@@ -93,6 +94,12 @@ export default function TerminusPiece({ position }) {
           silhouette as you approach down the hallway */}
       <pointLight position={[0, 2.6, 1.6]} color={GOLD_BRIGHT} intensity={22} distance={7} decay={1.8} />
       <pointLight position={[0, 2.2, -1.2]} color={GOLD} intensity={10} distance={5} decay={2} />
+
+      <Billboard position={[0, 0.15, 1.3]}>
+        <Text fontSize={0.1} color="#cfc9bd" anchorX="center" anchorY="middle" maxWidth={2.4}>
+          The furthest point still faces home.
+        </Text>
+      </Billboard>
     </group>
   )
 }
