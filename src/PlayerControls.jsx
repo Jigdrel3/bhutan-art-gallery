@@ -2,7 +2,11 @@ import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const MOUSE_SENSITIVITY = 0.00035
+// Repeatedly halved in response to "too high" feedback until it landed
+// here — 0.00035 means a full 180° turn takes ~9000px of mouse movement,
+// which reads as "hard to rotate," not "considered." Reset to a standard
+// FPS-control sensitivity instead of nudging it down a fifth time.
+const MOUSE_SENSITIVITY = 0.0015
 const WALK_SPEED = 3.2
 const ACCEL = 12
 const DAMPING = 10
