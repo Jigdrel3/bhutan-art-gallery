@@ -12,25 +12,20 @@ const MAT_BORDER = 0.12
 const FILLET = 0.03
 const SAFFRON = '#e0972f'
 
-// Crops the texture to fill the target aspect ratio (like CSS
-// object-fit: cover) instead of letting a plain UV-mapped plane stretch
-// whatever aspect ratio the source photo happens to be into the frame's
-// fixed shape — that stretching is what was reading as "distorted."
-function fitTextureCover(texture, targetAspect) {
+// Scales the photo (and its fillet) to fit *within* the frame opening
+// without cropping — like a real mat, where the outer frame/mat size never
+// changes but the photo itself shrinks on whichever axis doesn't match its
+// own aspect ratio, showing mat color in the gap rather than losing part
+// of the image. (An earlier cover-fit crop avoided stretching but was
+// cutting real content out of wide/tall photos — this replaces it.)
+function containScale(texture, targetAspect) {
   const img = texture.image
-  if (!img || !img.width || !img.height) return
+  if (!img || !img.width || !img.height) return [1, 1]
   const imgAspect = img.width / img.height
   if (imgAspect > targetAspect) {
-    const scale = targetAspect / imgAspect
-    texture.repeat.set(scale, 1)
-    texture.offset.set((1 - scale) / 2, 0)
-  } else {
-    const scale = imgAspect / targetAspect
-    texture.repeat.set(1, scale)
-    texture.offset.set(0, (1 - scale) / 2)
+    return [1, targetAspect / imgAspect]
   }
-  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
-  texture.needsUpdate = true
+  return [imgAspect / targetAspect, 1]
 }
 
 // A small L-shaped bracket at one mat corner, opening toward the center —
@@ -57,12 +52,15 @@ export default function Frame({ data }) {
   const { gl } = useThree()
   const matRef = useRef(null)
   const plaqueMatRef = useRef(null)
+  const photoGroupRef = useRef(null)
   const [near, setNear] = useState(false)
 
   useEffect(() => {
     texture.anisotropy = gl.capabilities.getMaxAnisotropy()
     texture.colorSpace = THREE.SRGBColorSpace
-    fitTextureCover(texture, FRAME_W / FRAME_H)
+    texture.needsUpdate = true
+    const [sx, sy] = containScale(texture, FRAME_W / FRAME_H)
+    if (photoGroupRef.current) photoGroupRef.current.scale.set(sx, sy, 1)
   }, [texture, gl])
 
   useFrame(({ camera }) => {
@@ -104,17 +102,20 @@ export default function Frame({ data }) {
         />
       </mesh>
 
-      {/* Thin gold fillet between mat and image, museum-style */}
-      <mesh position={[0, 0, -0.002]}>
-        <planeGeometry args={[FRAME_W + FILLET * 2, FRAME_H + FILLET * 2]} />
-        <meshStandardMaterial color={SAFFRON} roughness={0.3} metalness={0.6} />
-      </mesh>
+      {/* Fillet + photo scale together to the photo's true aspect ratio, so
+          the gold fillet always hugs the actual image edge rather than
+          sitting out in the mat wherever the photo doesn't reach. */}
+      <group ref={photoGroupRef}>
+        <mesh position={[0, 0, -0.002]}>
+          <planeGeometry args={[FRAME_W + FILLET * 2, FRAME_H + FILLET * 2]} />
+          <meshStandardMaterial color={SAFFRON} roughness={0.3} metalness={0.6} />
+        </mesh>
 
-      {/* Cover image */}
-      <mesh position={[0, 0, 0]}>
-        <planeGeometry args={[FRAME_W, FRAME_H]} />
-        <meshStandardMaterial map={texture} roughness={0.85} />
-      </mesh>
+        <mesh position={[0, 0, 0]}>
+          <planeGeometry args={[FRAME_W, FRAME_H]} />
+          <meshStandardMaterial map={texture} roughness={0.85} />
+        </mesh>
+      </group>
 
       {/* Restrained decorative corner marks on the mat */}
       <CornerFlourish cx={-halfW} cy={halfH} sx={-1} sy={1} />

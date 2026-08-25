@@ -106,14 +106,20 @@ canvas {
   width: min(66vw, 880px);
   height: min(58vh, 560px);
   overflow: hidden;
-  background: #000;
+  /* Matches .frame-mat so a letterboxed gap (see object-fit below) reads
+     as mat, not a black bar cutting into the presentation. */
+  background: #f4f0e6;
 }
 
 .frame-image-box img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* contain, not cover — a crop-to-fill was slicing real content off
+     photos whose aspect ratio didn't match the frame. The frame's outer
+     size stays fixed either way; only the photo itself now shrinks to fit
+     whole inside it, same as a real mat opening. */
+  object-fit: contain;
 }
 
 .viewer-nav {
