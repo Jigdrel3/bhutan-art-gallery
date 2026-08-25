@@ -3,7 +3,7 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #1a0a2e;
+  background: #0a0908;
 }
 
 .entrance-root canvas {
@@ -20,7 +20,7 @@
   text-align: center;
   pointer-events: none;
   font-family: system-ui, sans-serif;
-  color: #f4f0e6;
+  color: #f4ead2;
 }
 
 .entrance-copy h1 {
@@ -30,8 +30,8 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0;
-  color: #f4f0e6;
-  text-shadow: 0 0 24px rgba(242, 181, 68, 0.4);
+  color: #f4ead2;
+  text-shadow: 0 0 24px rgba(232, 163, 61, 0.4);
 }
 
 .entrance-subtitle {
@@ -48,4 +48,46 @@
   font-size: 0.8rem;
   opacity: 0.55;
   letter-spacing: 0.02em;
+}
+
+/* No-WebGL fallback — same mood (warm gold glow in a dark void), no 3D */
+.entrance-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entrance-fallback .entrance-copy {
+  position: relative;
+  bottom: auto;
+  pointer-events: auto;
+}
+
+.fallback-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22rem;
+  height: 22rem;
+  transform: translate(-50%, -60%);
+  background: radial-gradient(circle, rgba(232, 163, 61, 0.35) 0%, rgba(232, 163, 61, 0) 70%);
+  filter: blur(2px);
+}
+
+.fallback-enter {
+  margin-top: 1rem;
+  font-family: system-ui, sans-serif;
+  background: transparent;
+  border: 1px solid #e8a33d;
+  color: #e8a33d;
+  padding: 0.6rem 1.8rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fallback-enter:hover {
+  background: rgba(232, 163, 61, 0.12);
 }

@@ -1,321 +1,336 @@
 import { useRef, useState, useMemo, useEffect, forwardRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Environment, RoundedBox } from '@react-three/drei'
+import { Environment, Float } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { getMandalaTextures } from './lib/mandalaTexture'
 
 const prefersReducedMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const CRIMSON = '#c81d5e'
-const GOLD = '#f2b544'
-const TEAL = '#1fd3c4'
-const MAGENTA = '#ff3d7f'
+const VOID = '#0a0908'
+const MIST = '#3a3128'
+const SAFFRON = '#e8a33d'
+const MAROON = '#7a1f2b'
+const GLASS_TINT = '#f4ead2'
 
-// Same overlapping-sphere cloud motif as the hallway's terminus piece, so
-// the two ends of the experience rhyme with each other.
-function CloudCluster({ scale = 1, color = GOLD }) {
-  const lobes = useMemo(
-    () => [
-      [0, 0, 0, 0.34],
-      [0.3, 0.05, 0, 0.24],
-      [-0.28, 0.03, 0.05, 0.22],
-      [0.1, 0.18, -0.05, 0.2],
-      [-0.12, 0.15, 0.05, 0.18],
-    ],
-    []
-  )
-  return (
-    <group scale={scale}>
-      {lobes.map(([x, y, z, r], i) => (
-        <mesh key={i} position={[x, y, z]}>
-          <sphereGeometry args={[r, 16, 12]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.35} metalness={0.4} />
-        </mesh>
-      ))}
-    </group>
-  )
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3)
+}
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-function FloatingClouds() {
-  const group = useRef(null)
+// The etched glow edge — a separate emissive mesh (not just a material
+// property) so bloom has real geometry to bleed light from, matching the
+// reference image's "light escaping a shrine interior" edge.
+const GlowEdge = forwardRef(function GlowEdge({ baseIntensity }, ref) {
+  return (
+    <mesh ref={ref} position={[0.86, 0, 0]}>
+      <boxGeometry args={[0.05, 2.05, 1.25]} />
+      <meshStandardMaterial color={SAFFRON} emissive={SAFFRON} emissiveIntensity={baseIntensity} toneMapped={false} />
+    </mesh>
+  )
+})
+
+const MandalaGate = forwardRef(function MandalaGate({ hover, glowRef, activatingRef }, ref) {
+  const { normalMap, emissiveMap } = useMemo(() => getMandalaTextures(SAFFRON), [])
+  const hoverT = useRef(0)
+
   useFrame((_, delta) => {
-    if (group.current && !prefersReducedMotion) group.current.rotation.y += delta * 0.05
-  })
-  return (
-    <group ref={group}>
-      <group position={[-3.2, 1.4, -1.5]}>
-        <CloudCluster scale={0.9} color={GOLD} />
-      </group>
-      <group position={[3.4, -0.8, -1]}>
-        <CloudCluster scale={0.7} color={TEAL} />
-      </group>
-      <group position={[2.6, 1.9, -2.2]}>
-        <CloudCluster scale={0.5} color={MAGENTA} />
-      </group>
-      <group position={[-2.8, -1.6, -1.8]}>
-        <CloudCluster scale={0.6} color={GOLD} />
-      </group>
-    </group>
-  )
-}
+    // While the click-activation sequence is running, HeroCamera owns the
+    // glow intensity (ramping it to a whiteout) — don't fight it here.
+    if (activatingRef.current) return
 
-const CORNER_COLORS = [GOLD, TEAL, MAGENTA, GOLD, TEAL, MAGENTA, GOLD, TEAL]
+    const target = hover ? 1 : 0
+    const duration = hover ? 0.4 : 0.5
+    const dir = target - hoverT.current
+    hoverT.current = THREE.MathUtils.clamp(hoverT.current + Math.sign(dir) * (delta / duration), 0, 1)
+    const eased = easeOutCubic(hoverT.current)
 
-const Mass = forwardRef(function Mass(_, group) {
-  const [hovered, setHovered] = useState(false)
-  const corners = useMemo(() => {
-    const list = []
-    for (const x of [-1, 1]) {
-      for (const y of [-1, 1]) {
-        for (const z of [-1, 1]) {
-          list.push([x * 1.05, y * 0.75, z * 0.75])
-        }
-      }
+    if (glowRef.current) {
+      glowRef.current.material.emissiveIntensity = THREE.MathUtils.lerp(1.4, 2.0, eased)
     }
-    return list
-  }, [])
-
-  useFrame((state, delta) => {
-    if (!group.current) return
-    if (!prefersReducedMotion) {
-      group.current.position.y = Math.sin(state.clock.elapsedTime * 0.7) * 0.18
-      group.current.rotation.y += delta * 0.18
+    if (ref.current) {
+      const s = THREE.MathUtils.lerp(1, 1.03, eased)
+      ref.current.scale.set(s, s, s)
     }
-    const targetScale = hovered ? 1.06 : 1
-    group.current.scale.setScalar(THREE.MathUtils.lerp(group.current.scale.x, targetScale, Math.min(1, delta * 8)))
   })
 
   return (
-    <group
-      ref={group}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
-    >
-      {/* The solid mass — rounded edges read as a crafted object rather
-          than a flat-shaded box primitive, and the environment map is what
-          actually sells the material as something physical: without it a
-          PBR surface has nothing to reflect and looks like flat plastic. */}
-      <RoundedBox args={[2.1, 1.5, 1.5]} radius={0.09} smoothness={4} castShadow>
+    <group ref={ref}>
+      {/* Glass body — proportioned closer to a gau (portable shrine box)
+          than a plain cube: taller than it is wide, modest depth. */}
+      <mesh castShadow>
+        <boxGeometry args={[1.7, 2.1, 1.3]} />
         <meshPhysicalMaterial
-          color={CRIMSON}
-          emissive={CRIMSON}
-          emissiveIntensity={0.12}
-          roughness={0.32}
-          metalness={0.55}
-          clearcoat={0.6}
-          clearcoatRoughness={0.25}
+          color={GLASS_TINT}
+          transmission={0.92}
+          roughness={0.08}
+          ior={1.5}
+          thickness={0.6}
+          normalMap={normalMap}
+          normalScale={new THREE.Vector2(0.6, 0.6)}
+          emissiveMap={emissiveMap}
+          emissive={SAFFRON}
+          emissiveIntensity={0.5}
+          attenuationColor={GLASS_TINT}
+          attenuationDistance={1.2}
+          clearcoat={0.4}
+          clearcoatRoughness={0.2}
         />
-      </RoundedBox>
+      </mesh>
 
-      {/* Gold edge trim — thin rods along the 4 vertical edges, plus a
-          top/bottom perimeter strip, so the crimson body still reads as
-          the dominant color on every face. */}
+      {/* Gold structural frame */}
       {[
-        [1.05, 0.75],
-        [1.05, -0.75],
-        [-1.05, 0.75],
-        [-1.05, -0.75],
-      ].map(([x, z], i) => (
-        <mesh key={`v${i}`} position={[x, 0, z]}>
-          <boxGeometry args={[0.05, 1.5, 0.05]} />
-          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
+        [0.87, 1.05, 0.67],
+        [0.87, 1.05, -0.67],
+        [-0.87, 1.05, 0.67],
+        [-0.87, 1.05, -0.67],
+      ].map(([x, , z], i) => (
+        <mesh key={i} position={[x, 0, z]}>
+          <boxGeometry args={[0.045, 2.1, 0.045]} />
+          <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
         </mesh>
       ))}
-      <mesh position={[0, 0.78, 0]}>
-        <boxGeometry args={[2.16, 0.04, 1.58]} />
-        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
+      <mesh position={[0, 1.08, 0]}>
+        <boxGeometry args={[1.76, 0.04, 1.36]} />
+        <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
       </mesh>
-      <mesh position={[0, -0.78, 0]}>
-        <boxGeometry args={[2.16, 0.04, 1.58]} />
-        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
+      <mesh position={[0, -1.08, 0]}>
+        <boxGeometry args={[1.76, 0.04, 1.36]} />
+        <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
       </mesh>
 
-      {/* Front medallion — a simple dharma-wheel-style emblem */}
-      <group position={[0, 0, 0.76]}>
-        <mesh>
-          <torusGeometry args={[0.42, 0.045, 12, 40]} />
-          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.22} roughness={0.2} metalness={0.9} />
-        </mesh>
-        {Array.from({ length: 8 }, (_, i) => {
-          const a = (i / 8) * Math.PI * 2
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.21, Math.sin(a) * 0.21, 0]} rotation={[0, 0, a - Math.PI / 2]}>
-              <cylinderGeometry args={[0.012, 0.012, 0.4, 6]} />
-              <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.15} roughness={0.3} metalness={0.8} />
-            </mesh>
-          )
-        })}
-      </group>
+      {/* Base plinth — a quiet nod to a shrine's plinth rather than the
+          object simply floating with no grounding form at all */}
+      <mesh position={[0, -1.24, 0]}>
+        <boxGeometry args={[1.95, 0.14, 1.55]} />
+        <meshStandardMaterial color="#1c1712" roughness={0.6} metalness={0.3} />
+      </mesh>
 
-      {/* Vibrant gem accents at each corner */}
-      {corners.map((pos, i) => (
-        <mesh key={i} position={pos}>
-          <octahedronGeometry args={[0.09]} />
-          <meshStandardMaterial
-            color={CORNER_COLORS[i]}
-            emissive={CORNER_COLORS[i]}
-            emissiveIntensity={0.4}
-            roughness={0.15}
-            metalness={0.5}
-          />
-        </mesh>
-      ))}
+      <GlowEdge ref={glowRef} baseIntensity={1.4} />
     </group>
   )
 })
 
-// Drag to orbit, scroll/pinch to zoom — a simple always-on version of the
-// same orbit-camera idea used elsewhere in the gallery, scoped to this one
-// scene since there's nothing else here to hand control back and forth to.
-function OrbitCamera({ onEnter, massRef }) {
+// Warm, slow-drifting mist motes/embers rather than a static starfield.
+function EmberParticles({ count = 320 }) {
+  const points = useRef(null)
+  const { positions, speeds } = useMemo(() => {
+    const positions = new Float32Array(count * 3)
+    const speeds = new Float32Array(count)
+    for (let i = 0; i < count; i++) {
+      const radius = 3 + Math.random() * 5
+      const angle = Math.random() * Math.PI * 2
+      positions[i * 3] = Math.cos(angle) * radius
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 5
+      positions[i * 3 + 2] = Math.sin(angle) * radius - 1
+      speeds[i] = 0.04 + Math.random() * 0.08
+    }
+    return { positions, speeds }
+  }, [count])
+
+  useFrame((_, delta) => {
+    if (prefersReducedMotion || !points.current) return
+    const arr = points.current.geometry.attributes.position.array
+    for (let i = 0; i < count; i++) {
+      arr[i * 3 + 1] += speeds[i] * delta
+      if (arr[i * 3 + 1] > 3) arr[i * 3 + 1] = -2
+    }
+    points.current.geometry.attributes.position.needsUpdate = true
+  })
+
+  return (
+    <points ref={points}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        color={SAFFRON}
+        size={0.03}
+        transparent
+        opacity={0.45}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
+// Soft radial saffron glow on the ground beneath the object, pulsing very
+// slightly in sync with the float's vertical bob.
+function GroundGlow() {
+  const mesh = useRef(null)
+  const texture = useMemo(() => {
+    const size = 256
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    grad.addColorStop(0, 'rgba(232,163,61,0.55)')
+    grad.addColorStop(1, 'rgba(232,163,61,0)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, size, size)
+    return new THREE.CanvasTexture(canvas)
+  }, [])
+
+  useFrame(({ clock }) => {
+    if (!mesh.current || prefersReducedMotion) return
+    const pulse = 0.9 + Math.sin(clock.elapsedTime * 0.7) * 0.08
+    mesh.current.scale.set(pulse, pulse, 1)
+  })
+
+  return (
+    <mesh ref={mesh} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.55, 0]}>
+      <planeGeometry args={[4.5, 4.5]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+    </mesh>
+  )
+}
+
+// Mostly-static camera per the PRD (this is a hero moment, not the walkable
+// hall) — a few degrees of parallax tied to mouse position, plus the
+// click-to-activate transition that pushes toward the object and cross-
+// fades into the gallery.
+function HeroCamera({ onEnter, objectRef, glowRef, bloomRef, setHover, activatingRef }) {
   const { camera, gl } = useThree()
-  const spherical = useRef(new THREE.Spherical(6, Math.PI / 2.3, 0.4))
-  const goal = useRef(new THREE.Spherical(6, Math.PI / 2.3, 0.4))
+  const basePos = useRef(new THREE.Vector3(0, 0.3, 5.5))
+  const mouse = useRef({ x: 0, y: 0 })
+  const raycaster = useRef(new THREE.Raycaster())
+  const activateT = useRef(0)
   const onEnterRef = useRef(onEnter)
   onEnterRef.current = onEnter
-  const raycaster = useRef(new THREE.Raycaster())
+
+  useEffect(() => {
+    camera.position.copy(basePos.current)
+    camera.lookAt(0, 0, 0)
+  }, [camera])
 
   useEffect(() => {
     const canvas = gl.domElement
-    let dragging = false
-    let lastX = 0
-    let lastY = 0
-    let pinchDist = null
-    // A native `click` still fires on mouseup even after a drag, so entry
-    // is gated on how far the pointer actually moved — a real drag-to-orbit
-    // shouldn't also count as "clicking the mass." It's also gated on the
-    // click actually landing on the mass, not just anywhere in the scene.
-    let dragDistance = 0
-    const CLICK_THRESHOLD = 6
+    let downX = 0
+    let downY = 0
+    let downTime = 0
 
-    const tryEnterAt = (clientX, clientY) => {
-      if (!massRef.current) return
+    const onPointerMove = (e) => {
       const rect = canvas.getBoundingClientRect()
-      const ndc = new THREE.Vector2(
-        ((clientX - rect.left) / rect.width) * 2 - 1,
-        -((clientY - rect.top) / rect.height) * 2 + 1
-      )
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      if (!objectRef.current) return
+      const ndc = new THREE.Vector2(mouse.current.x, mouse.current.y)
       raycaster.current.setFromCamera(ndc, camera)
-      const hits = raycaster.current.intersectObject(massRef.current, true)
-      if (hits.length > 0) onEnterRef.current()
+      const hits = raycaster.current.intersectObject(objectRef.current, true)
+      setHover(hits.length > 0)
     }
 
     const onDown = (e) => {
-      dragging = true
-      dragDistance = 0
-      lastX = e.clientX
-      lastY = e.clientY
+      downX = e.clientX
+      downY = e.clientY
+      downTime = performance.now()
     }
     const onUp = (e) => {
-      dragging = false
-      if (dragDistance < CLICK_THRESHOLD) tryEnterAt(e.clientX, e.clientY)
-    }
-    const onMove = (e) => {
-      if (!dragging) return
-      const dx = e.clientX - lastX
-      const dy = e.clientY - lastY
-      lastX = e.clientX
-      lastY = e.clientY
-      dragDistance += Math.abs(dx) + Math.abs(dy)
-      goal.current.theta -= dx * 0.006
-      goal.current.phi = THREE.MathUtils.clamp(goal.current.phi - dy * 0.006, 0.5, 2.3)
-    }
-    const onWheel = (e) => {
-      e.preventDefault()
-      goal.current.radius = THREE.MathUtils.clamp(goal.current.radius + e.deltaY * 0.003, 3.5, 9)
-    }
-    const onTouchStart = (e) => {
-      if (e.touches.length === 1) {
-        dragging = true
-        dragDistance = 0
-        lastX = e.touches[0].clientX
-        lastY = e.touches[0].clientY
-      } else if (e.touches.length === 2) {
-        dragging = false
-        const [a, b] = e.touches
-        pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+      const moved = Math.hypot(e.clientX - downX, e.clientY - downY)
+      const elapsed = performance.now() - downTime
+      if (moved > 6 || elapsed > 600 || activatingRef.current) return
+      if (!objectRef.current) return
+      const rect = canvas.getBoundingClientRect()
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      )
+      raycaster.current.setFromCamera(ndc, camera)
+      const hits = raycaster.current.intersectObject(objectRef.current, true)
+      if (hits.length > 0) {
+        activatingRef.current = true
+        activateT.current = 0
       }
-    }
-    const onTouchMove = (e) => {
-      if (e.touches.length === 1 && dragging) {
-        const dx = e.touches[0].clientX - lastX
-        const dy = e.touches[0].clientY - lastY
-        lastX = e.touches[0].clientX
-        lastY = e.touches[0].clientY
-        dragDistance += Math.abs(dx) + Math.abs(dy)
-        goal.current.theta -= dx * 0.006
-        goal.current.phi = THREE.MathUtils.clamp(goal.current.phi - dy * 0.006, 0.5, 2.3)
-      } else if (e.touches.length === 2 && pinchDist != null) {
-        const [a, b] = e.touches
-        const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-        goal.current.radius = THREE.MathUtils.clamp(goal.current.radius + (pinchDist - dist) * 0.01, 3.5, 9)
-        pinchDist = dist
-      }
-    }
-    const onTouchEnd = () => {
-      const wasDragging = dragging
-      dragging = false
-      pinchDist = null
-      if (wasDragging && dragDistance < CLICK_THRESHOLD) tryEnterAt(lastX, lastY)
     }
 
+    canvas.addEventListener('mousemove', onPointerMove)
     canvas.addEventListener('mousedown', onDown)
     window.addEventListener('mouseup', onUp)
-    window.addEventListener('mousemove', onMove)
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    canvas.addEventListener('touchstart', onTouchStart, { passive: true })
-    canvas.addEventListener('touchmove', onTouchMove, { passive: true })
-    canvas.addEventListener('touchend', onTouchEnd)
-
     return () => {
+      canvas.removeEventListener('mousemove', onPointerMove)
       canvas.removeEventListener('mousedown', onDown)
       window.removeEventListener('mouseup', onUp)
-      window.removeEventListener('mousemove', onMove)
-      canvas.removeEventListener('wheel', onWheel)
-      canvas.removeEventListener('touchstart', onTouchStart)
-      canvas.removeEventListener('touchmove', onTouchMove)
-      canvas.removeEventListener('touchend', onTouchEnd)
     }
-  }, [gl, camera, massRef])
+  }, [camera, gl, objectRef, setHover])
 
   useFrame((_, delta) => {
-    const damp = Math.min(1, delta * 6)
-    spherical.current.radius += (goal.current.radius - spherical.current.radius) * damp
-    spherical.current.phi += (goal.current.phi - spherical.current.phi) * damp
-    let dTheta = goal.current.theta - spherical.current.theta
-    dTheta = ((dTheta + Math.PI) % (Math.PI * 2)) - Math.PI
-    spherical.current.theta += dTheta * damp
+    if (activatingRef.current) {
+      const duration = prefersReducedMotion ? 0.45 : 1.2
+      activateT.current = Math.min(1, activateT.current + delta / duration)
+      const e = easeInOutCubic(activateT.current)
 
-    camera.position.setFromSpherical(spherical.current)
-    camera.lookAt(0, 0, 0)
+      if (!prefersReducedMotion) {
+        camera.position.lerpVectors(basePos.current, new THREE.Vector3(0, 0.1, 1.4), e)
+      }
+      if (glowRef.current) glowRef.current.material.emissiveIntensity = THREE.MathUtils.lerp(1.4, 9, e)
+      if (bloomRef.current) bloomRef.current.intensity = THREE.MathUtils.lerp(0.6, 4, e)
+
+      if (activateT.current >= 1) {
+        activatingRef.current = false
+        onEnterRef.current()
+      }
+      return
+    }
+
+    if (!prefersReducedMotion) {
+      const targetX = basePos.current.x + mouse.current.x * 0.35
+      const targetY = basePos.current.y + mouse.current.y * 0.2
+      camera.position.x += (targetX - camera.position.x) * Math.min(1, delta * 2.5)
+      camera.position.y += (targetY - camera.position.y) * Math.min(1, delta * 2.5)
+      camera.lookAt(0, 0, 0)
+    }
   })
 
   return null
 }
 
 export default function EntranceScene({ onEnter }) {
-  const massRef = useRef(null)
+  const objectRef = useRef(null)
+  const glowRef = useRef(null)
+  const bloomRef = useRef(null)
+  const activatingRef = useRef(false)
+  const [hover, setHover] = useState(false)
 
   return (
     <>
-      <color attach="background" args={['#1a0a2e']} />
-      <fog attach="fog" args={['#1a0a2e', 7, 15]} />
+      <color attach="background" args={[VOID]} />
+      <fogExp2 attach="fog" args={[MIST, 0.09]} />
 
-      {/* Reflections are what make PBR materials read as real instead of
-          flat-shaded plastic — without an environment map to reflect,
-          metalness/clearcoat have nothing to show. Lighting-only (no
-          skybox), so it doesn't fight the void background/fog above. */}
       <Environment preset="sunset" />
+      <ambientLight intensity={0.25} color={MIST} />
+      <pointLight position={[2, 1.5, 2]} color={SAFFRON} intensity={18} distance={9} decay={1.8} />
+      <pointLight position={[-2, -1, 1.5]} color={MAROON} intensity={10} distance={7} decay={2} />
+      <pointLight position={[0, 2.2, -2]} color={SAFFRON} intensity={8} distance={7} decay={2} />
 
-      <ambientLight intensity={0.35} color="#6a4fa0" />
-      <pointLight position={[3.5, 2.5, 3]} color={TEAL} intensity={55} distance={13} decay={1.8} />
-      <pointLight position={[-3.5, -1.5, 2.5]} color={GOLD} intensity={45} distance={12} decay={1.8} />
-      <pointLight position={[0, -2.5, 3.5]} color={MAGENTA} intensity={40} distance={11} decay={2} />
-      <pointLight position={[0, 3, -3]} color={GOLD} intensity={20} distance={9} decay={2} />
+      {prefersReducedMotion ? (
+        <MandalaGate ref={objectRef} hover={hover} glowRef={glowRef} activatingRef={activatingRef} />
+      ) : (
+        <Float speed={1.1} rotationIntensity={0.25} floatIntensity={0.5} floatingRange={[-0.2, 0.2]}>
+          <MandalaGate ref={objectRef} hover={hover} glowRef={glowRef} activatingRef={activatingRef} />
+        </Float>
+      )}
 
-      <Mass ref={massRef} />
-      <FloatingClouds />
-      <OrbitCamera onEnter={onEnter} massRef={massRef} />
+      <GroundGlow />
+      <EmberParticles />
+      <HeroCamera
+        onEnter={onEnter}
+        objectRef={objectRef}
+        glowRef={glowRef}
+        bloomRef={bloomRef}
+        setHover={setHover}
+        activatingRef={activatingRef}
+      />
+
+      <EffectComposer>
+        <Bloom ref={bloomRef} luminanceThreshold={0.35} luminanceSmoothing={0.3} intensity={0.6} mipmapBlur />
+      </EffectComposer>
     </>
   )
 }
