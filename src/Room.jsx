@@ -29,7 +29,7 @@ function SpotWithTarget({ position, targetPosition, color, intensity, angle, pen
         angle={angle}
         penumbra={penumbra}
         distance={distance}
-        decay={1.4}
+        decay={1.6}
       />
       <object3D ref={target} position={targetPosition} />
     </>
@@ -151,13 +151,44 @@ function BaseWash() {
   return (
     <>
       {spots.map(([x, z], i) => (
-        <pointLight key={i} position={[x, 0.3, z]} color={MAROON} intensity={6} distance={6} decay={2} />
+        <pointLight key={i} position={[x, 0.25, z]} color={MAROON} intensity={1.4} distance={4.5} decay={2.2} />
       ))}
     </>
   )
 }
 
-export default function Room() {
+// One spotlight per actual frame, aimed at that frame specifically —
+// derived from the same laid-out category data the frames themselves use,
+// so lighting always matches wherever layout.js decides to put them
+// (including multiple frames sharing a wall once there are more than 4
+// categories).
+function FrameSpotlights({ categories }) {
+  return (
+    <>
+      {categories.map((cat) => {
+        const [px, py, pz] = cat.position
+        const ry = cat.rotation[1]
+        const inX = -Math.sin(ry)
+        const inZ = -Math.cos(ry)
+        const inwardOffset = 3
+        return (
+          <SpotWithTarget
+            key={cat.id}
+            position={[px + inX * inwardOffset, HEIGHT - 0.5, pz + inZ * inwardOffset]}
+            targetPosition={[px, py + 0.1, pz]}
+            color={SAFFRON}
+            intensity={130}
+            angle={0.42}
+            penumbra={0.55}
+            distance={9}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+export default function Room({ categories }) {
   return (
     <group>
       {/* Floor */}
@@ -205,41 +236,26 @@ export default function Room() {
       </group>
 
       {/* Statue uplight (subtle accent, not the main light source) */}
-      <pointLight position={[0, 1.2, 0]} color={MAROON} intensity={8} distance={4.5} decay={2} />
+      <pointLight position={[0, 1.2, 0]} color={MAROON} intensity={4} distance={3.5} decay={2.2} />
       <SpotWithTarget
         position={[0, HEIGHT - 0.3, 0]}
         targetPosition={[0, 1.55, 0]}
         color={SAFFRON}
-        intensity={220}
+        intensity={150}
         angle={0.5}
         penumbra={0.6}
         distance={12}
       />
 
-      {/* Wall spotlights (placeholder frame positions) */}
-      {[
-        [0, -HALF + 0.1],
-        [0, HALF - 0.1],
-        [-HALF + 0.1, 0],
-        [HALF - 0.1, 0],
-      ].map(([x, z], i) => (
-        <SpotWithTarget
-          key={i}
-          position={[x * 0.55, HEIGHT - 0.5, z * 0.55]}
-          targetPosition={[x, 2, z]}
-          color={SAFFRON}
-          intensity={260}
-          angle={0.6}
-          penumbra={0.5}
-          distance={11}
-        />
-      ))}
+      <FrameSpotlights categories={categories} />
 
       <BaseWash />
 
-      {/* Soft overall fill so the architecture reads even away from spotlights */}
-      <hemisphereLight args={['#5a5578', '#0c0c10', 0.75]} />
-      <ambientLight intensity={0.45} color="#443f60" />
+      {/* Soft overall fill so the architecture reads even away from spotlights —
+          kept cool and dim so it reads as shadow, not a second light source,
+          giving the warm spotlights something dark to contrast against. */}
+      <hemisphereLight args={['#3a3f52', '#08080a', 0.35]} />
+      <ambientLight intensity={0.16} color="#2a2c3a" />
     </group>
   )
 }

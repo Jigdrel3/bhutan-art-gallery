@@ -66,12 +66,12 @@ export default function App() {
       <Canvas
         shadows
         camera={{ fov: 70, near: 0.1, far: 100 }}
-        gl={{ antialias: true, toneMappingExposure: 1.4 }}
+        gl={{ antialias: true, toneMappingExposure: 1.15 }}
       >
         <color attach="background" args={['#08080a']} />
         <fog attach="fog" args={['#08080a', 15, 32]} />
         <Suspense fallback={null}>
-          <Room />
+          <Room categories={categories} />
           <CategoryFrames categories={categories} />
           <StandingMarkers categories={categories} />
           <StatueZone onEnter={handleEnterStatue} disabled={busy} />

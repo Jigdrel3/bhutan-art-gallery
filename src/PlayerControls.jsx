@@ -2,7 +2,7 @@ import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const MOUSE_SENSITIVITY = 0.0006
+const MOUSE_SENSITIVITY = 0.00035
 const WALK_SPEED = 3.2
 const ACCEL = 12
 const DAMPING = 10
