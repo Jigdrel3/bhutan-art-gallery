@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Room from './Room'
 import PlayerControls from './PlayerControls'
@@ -6,30 +6,27 @@ import CategoryFrames from './CategoryFrames'
 import StandingMarkers from './StandingMarkers'
 import HallInteractions, { approachParamsFor } from './HallInteractions'
 import CategoryViewer from './CategoryViewer'
-import StatueZone from './StatueZone'
-import StatueOrbit from './StatueOrbit'
-import StatueOverlay from './StatueOverlay'
+import Entrance from './Entrance'
 import { fetchCategories } from './dataSource'
+import { HALLWAY_WIDTH, MIN_LENGTH } from './layout'
 import './App.css'
 
-const STATUE_TARGET = [0, 1.55, 0]
-const STATUE_MIN_RADIUS = 1.7
-const STATUE_MAX_RADIUS = 5.5
+const PLAYER_RADIUS = 0.4
 
 export default function App() {
+  const [gateOpen, setGateOpen] = useState(false)
   const [locked, setLocked] = useState(false)
   const [entered, setEntered] = useState(null)
   const [transitioning, setTransitioning] = useState(false)
-  const [statueActive, setStatueActive] = useState(false)
-  const [categories, setCategories] = useState([])
+  const [hall, setHall] = useState({ frames: [], totalLength: MIN_LENGTH })
   const [loadingCategories, setLoadingCategories] = useState(true)
   const controlsRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
-    fetchCategories().then((cats) => {
+    fetchCategories().then((result) => {
       if (cancelled) return
-      setCategories(cats)
+      setHall(result)
       setLoadingCategories(false)
     })
     return () => {
@@ -54,12 +51,21 @@ export default function App() {
     })
   }, [])
 
-  const handleEnterStatue = useCallback(() => {
-    document.exitPointerLock()
-    setStatueActive(true)
-  }, [])
+  const busy = transitioning || !!entered
 
-  const busy = transitioning || !!entered || statueActive
+  const bounds = useMemo(
+    () => ({
+      minX: -HALLWAY_WIDTH / 2 + PLAYER_RADIUS,
+      maxX: HALLWAY_WIDTH / 2 - PLAYER_RADIUS,
+      minZ: PLAYER_RADIUS * 1.5,
+      maxZ: hall.totalLength - PLAYER_RADIUS * 1.5,
+    }),
+    [hall.totalLength]
+  )
+
+  if (!gateOpen) {
+    return <Entrance onEnter={() => setGateOpen(true)} />
+  }
 
   return (
     <div className="app-root">
@@ -69,23 +75,14 @@ export default function App() {
         gl={{ antialias: true, toneMappingExposure: 1.15 }}
       >
         <color attach="background" args={['#08080a']} />
-        <fog attach="fog" args={['#08080a', 15, 32]} />
+        <fog attach="fog" args={['#08080a', 15, 34]} />
         <Suspense fallback={null}>
-          <Room categories={categories} />
-          <CategoryFrames categories={categories} />
-          <StandingMarkers categories={categories} />
-          <StatueZone onEnter={handleEnterStatue} disabled={busy} />
+          <Room frames={hall.frames} totalLength={hall.totalLength} />
+          <CategoryFrames categories={hall.frames} />
+          <StandingMarkers categories={hall.frames} />
         </Suspense>
-        <PlayerControls ref={controlsRef} />
-        <HallInteractions categories={categories} onEnter={handleEnter} disabled={busy} />
-        <StatueOrbit
-          active={statueActive}
-          target={STATUE_TARGET}
-          minRadius={STATUE_MIN_RADIUS}
-          maxRadius={STATUE_MAX_RADIUS}
-          controlsRef={controlsRef}
-          onExit={() => setStatueActive(false)}
-        />
+        <PlayerControls ref={controlsRef} bounds={bounds} />
+        <HallInteractions categories={hall.frames} onEnter={handleEnter} disabled={busy} />
       </Canvas>
 
       {loadingCategories && (
@@ -94,7 +91,7 @@ export default function App() {
         </div>
       )}
 
-      {!loadingCategories && !locked && !entered && !statueActive && (
+      {!loadingCategories && !locked && !entered && (
         <div className="overlay hint">
           <p>Click anywhere to step inside</p>
           <p className="hint-sub">
@@ -104,7 +101,6 @@ export default function App() {
       )}
 
       {entered && <CategoryViewer category={entered} onClose={() => setEntered(null)} />}
-      {statueActive && <StatueOverlay onClose={() => setStatueActive(false)} />}
     </div>
   )
 }

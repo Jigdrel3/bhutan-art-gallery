@@ -1,31 +1,19 @@
 // Turns an ordered list of plain category records (id/title/wallText/cover/
-// images) into positioned frames on the hall's four walls. This is what
-// makes the hall "data-driven": add a 5th category and it just takes the
-// next open slot, round-robin across the walls, with no code change.
-export const HALL_RADIUS = 10
+// images) into a hallway: frames face each other across two side walls,
+// added in pairs (left, right, left, right, ...) walking away from the
+// entrance, and the hallway's length grows to fit however many categories
+// exist — always ending in open space for the terminus piece at the far end.
+export const HALLWAY_WIDTH = 8
 export const WALL_Y = 2.1
-export const FRAME_SPACING = 2.6
+export const SEGMENT_DEPTH = 4.4
+export const ENTRANCE_MARGIN = 4.5
+export const END_MARGIN = 5.5
+export const MIN_LENGTH = ENTRANCE_MARGIN + END_MARGIN
 
 // How far in front of a wall the standing marker sits, and how close you
 // need to be to it for the frame to light up and respond to a click.
-export const STANDOFF = 2.0
-export const INTERACT_RADIUS = 1.1
-
-const WALLS = ['north', 'south', 'west', 'east']
-
-function wallTransform(wall, offset) {
-  switch (wall) {
-    case 'north':
-      return { position: [offset, WALL_Y, -HALL_RADIUS + 0.08], rotation: [0, 0, 0] }
-    case 'south':
-      return { position: [-offset, WALL_Y, HALL_RADIUS - 0.08], rotation: [0, Math.PI, 0] }
-    case 'west':
-      return { position: [-HALL_RADIUS + 0.08, WALL_Y, offset], rotation: [0, Math.PI / 2, 0] }
-    case 'east':
-    default:
-      return { position: [HALL_RADIUS - 0.08, WALL_Y, -offset], rotation: [0, -Math.PI / 2, 0] }
-  }
-}
+export const STANDOFF = 1.7
+export const INTERACT_RADIUS = 1.05
 
 // The point on the floor STANDOFF metres in front of a wall-mounted frame,
 // derived from the frame's own facing (rotation[1]).
@@ -35,24 +23,19 @@ export function standingSpotFor(position, rotationY) {
 }
 
 export function layoutCategories(rawList) {
-  const byWall = { north: [], south: [], west: [], east: [] }
-  rawList.forEach((cat, i) => byWall[WALLS[i % WALLS.length]].push(cat))
+  const pairCount = Math.ceil(rawList.length / 2)
+  const totalLength = Math.max(MIN_LENGTH, ENTRANCE_MARGIN + pairCount * SEGMENT_DEPTH + END_MARGIN)
 
-  const placed = []
-  for (const wall of WALLS) {
-    const arr = byWall[wall]
-    const n = arr.length
-    arr.forEach((cat, idx) => {
-      const offset = (idx - (n - 1) / 2) * FRAME_SPACING
-      const { position, rotation } = wallTransform(wall, offset)
-      placed.push({
-        ...cat,
-        wall,
-        position,
-        rotation,
-        standingSpot: standingSpotFor(position, rotation[1]),
-      })
-    })
-  }
-  return placed
+  const frames = rawList.map((cat, i) => {
+    const pairIndex = Math.floor(i / 2)
+    const side = i % 2 === 0 ? 'left' : 'right'
+    const z = ENTRANCE_MARGIN + pairIndex * SEGMENT_DEPTH + SEGMENT_DEPTH / 2
+    const x = side === 'left' ? -HALLWAY_WIDTH / 2 + 0.08 : HALLWAY_WIDTH / 2 - 0.08
+    const rotationY = side === 'left' ? Math.PI / 2 : -Math.PI / 2
+    const position = [x, WALL_Y, z]
+    const rotation = [0, rotationY, 0]
+    return { ...cat, side, position, rotation, standingSpot: standingSpotFor(position, rotationY) }
+  })
+
+  return { frames, totalLength }
 }

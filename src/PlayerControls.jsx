@@ -7,18 +7,17 @@ const WALK_SPEED = 3.2
 const ACCEL = 12
 const DAMPING = 10
 const EYE_HEIGHT = 1.7
-const ROOM_HALF = 9 // matches Room.jsx floor size 20x20 minus wall margin
-const PLAYER_RADIUS = 0.4
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-const PlayerControls = forwardRef(function PlayerControls(_, ref) {
+const PlayerControls = forwardRef(function PlayerControls({ bounds }, ref) {
   const { camera, gl } = useThree()
   const keys = useRef({ forward: false, back: false, left: false, right: false })
   const velocity = useRef(new THREE.Vector3())
-  const yaw = useRef(0)
+  // Spawn just inside the entrance, facing down the hallway (+z).
+  const yaw = useRef(Math.PI)
   const pitch = useRef(0)
   const locked = useRef(false)
 
@@ -40,9 +39,9 @@ const PlayerControls = forwardRef(function PlayerControls(_, ref) {
       }
       velocity.current.set(0, 0, 0)
     },
-    // Hands full camera control to something else (e.g. the statue's orbit
-    // view). Restores cleanly: yaw/pitch are re-synced from the camera's
-    // actual rotation on resume so mouse-look doesn't jump.
+    // Hands full camera control to something else. Restores cleanly:
+    // yaw/pitch are re-synced from the camera's actual rotation on resume
+    // so mouse-look doesn't jump.
     setSuspended(value) {
       suspended.current = value
       if (!value) {
@@ -54,7 +53,7 @@ const PlayerControls = forwardRef(function PlayerControls(_, ref) {
   }))
 
   useEffect(() => {
-    camera.position.set(0, EYE_HEIGHT, 6)
+    camera.position.set(0, EYE_HEIGHT, 1.6)
   }, [camera])
 
   useEffect(() => {
@@ -106,8 +105,6 @@ const PlayerControls = forwardRef(function PlayerControls(_, ref) {
     }
 
     const onClick = () => {
-      // While suspended (e.g. the statue's orbit view owns the camera), a
-      // plain click shouldn't silently re-lock the pointer out from under it.
       if (!locked.current && !suspended.current) canvas.requestPointerLock()
     }
 
@@ -229,16 +226,11 @@ const PlayerControls = forwardRef(function PlayerControls(_, ref) {
     let nextX = camera.position.x + velocity.current.x * dt
     let nextZ = camera.position.z + velocity.current.z * dt
 
-    // Collision: clamp inside room bounds, keep out of the center statue plinth
-    nextX = Math.max(-ROOM_HALF + PLAYER_RADIUS, Math.min(ROOM_HALF - PLAYER_RADIUS, nextX))
-    nextZ = Math.max(-ROOM_HALF + PLAYER_RADIUS, Math.min(ROOM_HALF - PLAYER_RADIUS, nextZ))
-
-    const distFromCenter = Math.hypot(nextX, nextZ)
-    const plinthRadius = 1.6
-    if (distFromCenter < plinthRadius + PLAYER_RADIUS) {
-      const angle = Math.atan2(nextZ, nextX)
-      nextX = Math.cos(angle) * (plinthRadius + PLAYER_RADIUS)
-      nextZ = Math.sin(angle) * (plinthRadius + PLAYER_RADIUS)
+    // Collision: clamp inside the hallway's current bounds (grows as
+    // categories are added — see App.jsx).
+    if (bounds) {
+      nextX = Math.max(bounds.minX, Math.min(bounds.maxX, nextX))
+      nextZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, nextZ))
     }
 
     camera.position.x = nextX
