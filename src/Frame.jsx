@@ -6,26 +6,25 @@ import { INTERACT_RADIUS } from './layout'
 import { transformedImageUrl } from './lib/imageUrl'
 
 const GLOW_RANGE = 3.6
-const FRAME_W = 1.6
-const FRAME_H = 2.1
+// The largest a frame can be — actual frame size is derived per-image from
+// its own aspect ratio and capped to fit inside this envelope, so the
+// frame follows the photo's real shape instead of forcing every photo into
+// one fixed box (which either stretched, cropped, or letterboxed it).
+const MAX_W = 1.8
+const MAX_H = 2.3
 const MAT_BORDER = 0.12
 const FILLET = 0.03
 const SAFFRON = '#e0972f'
 
-// Scales the photo (and its fillet) to fit *within* the frame opening
-// without cropping — like a real mat, where the outer frame/mat size never
-// changes but the photo itself shrinks on whichever axis doesn't match its
-// own aspect ratio, showing mat color in the gap rather than losing part
-// of the image. (An earlier cover-fit crop avoided stretching but was
-// cutting real content out of wide/tall photos — this replaces it.)
-function containScale(texture, targetAspect) {
+function sizeWithinEnvelope(texture) {
   const img = texture.image
-  if (!img || !img.width || !img.height) return [1, 1]
+  if (!img || !img.width || !img.height) return [MAX_W, MAX_H]
   const imgAspect = img.width / img.height
-  if (imgAspect > targetAspect) {
-    return [1, targetAspect / imgAspect]
+  const envelopeAspect = MAX_W / MAX_H
+  if (imgAspect > envelopeAspect) {
+    return [MAX_W, MAX_W / imgAspect]
   }
-  return [imgAspect / targetAspect, 1]
+  return [MAX_H * imgAspect, MAX_H]
 }
 
 // A small L-shaped bracket at one mat corner, opening toward the center —
@@ -52,15 +51,14 @@ export default function Frame({ data }) {
   const { gl } = useThree()
   const matRef = useRef(null)
   const plaqueMatRef = useRef(null)
-  const photoGroupRef = useRef(null)
   const [near, setNear] = useState(false)
+  const [[frameW, frameH], setSize] = useState([MAX_W, MAX_H])
 
   useEffect(() => {
     texture.anisotropy = gl.capabilities.getMaxAnisotropy()
     texture.colorSpace = THREE.SRGBColorSpace
     texture.needsUpdate = true
-    const [sx, sy] = containScale(texture, FRAME_W / FRAME_H)
-    if (photoGroupRef.current) photoGroupRef.current.scale.set(sx, sy, 1)
+    setSize(sizeWithinEnvelope(texture))
   }, [texture, gl])
 
   useFrame(({ camera }) => {
@@ -79,20 +77,20 @@ export default function Frame({ data }) {
     if (shouldBeNear !== near) setNear(shouldBeNear)
   })
 
-  const halfW = FRAME_W / 2 + MAT_BORDER * 0.55
-  const halfH = FRAME_H / 2 + MAT_BORDER * 0.55
+  const halfW = frameW / 2 + MAT_BORDER * 0.55
+  const halfH = frameH / 2 + MAT_BORDER * 0.55
 
   return (
     <group position={data.position} rotation={data.rotation} userData={{ categoryId: data.id }}>
       {/* Dark outer frame edge */}
       <mesh position={[0, 0, -0.03]}>
-        <boxGeometry args={[FRAME_W + MAT_BORDER * 2 + 0.06, FRAME_H + MAT_BORDER * 2 + 0.06, 0.05]} />
+        <boxGeometry args={[frameW + MAT_BORDER * 2 + 0.06, frameH + MAT_BORDER * 2 + 0.06, 0.05]} />
         <meshStandardMaterial color="#0a0a0c" roughness={0.5} metalness={0.3} />
       </mesh>
 
       {/* White mat border */}
       <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[FRAME_W + MAT_BORDER * 2, FRAME_H + MAT_BORDER * 2]} />
+        <planeGeometry args={[frameW + MAT_BORDER * 2, frameH + MAT_BORDER * 2]} />
         <meshStandardMaterial
           ref={matRef}
           color="#f4f0e6"
@@ -102,20 +100,18 @@ export default function Frame({ data }) {
         />
       </mesh>
 
-      {/* Fillet + photo scale together to the photo's true aspect ratio, so
-          the gold fillet always hugs the actual image edge rather than
-          sitting out in the mat wherever the photo doesn't reach. */}
-      <group ref={photoGroupRef}>
-        <mesh position={[0, 0, -0.002]}>
-          <planeGeometry args={[FRAME_W + FILLET * 2, FRAME_H + FILLET * 2]} />
-          <meshStandardMaterial color={SAFFRON} roughness={0.3} metalness={0.6} />
-        </mesh>
+      {/* Thin gold fillet right at the image edge */}
+      <mesh position={[0, 0, -0.002]}>
+        <planeGeometry args={[frameW + FILLET * 2, frameH + FILLET * 2]} />
+        <meshStandardMaterial color={SAFFRON} roughness={0.3} metalness={0.6} />
+      </mesh>
 
-        <mesh position={[0, 0, 0]}>
-          <planeGeometry args={[FRAME_W, FRAME_H]} />
-          <meshStandardMaterial map={texture} roughness={0.85} />
-        </mesh>
-      </group>
+      {/* The photo, at its own true aspect ratio — no crop, no stretch,
+          no letterbox padding to a fixed size. */}
+      <mesh position={[0, 0, 0]}>
+        <planeGeometry args={[frameW, frameH]} />
+        <meshStandardMaterial map={texture} roughness={0.85} />
+      </mesh>
 
       {/* Restrained decorative corner marks on the mat */}
       <CornerFlourish cx={-halfW} cy={halfH} sx={-1} sy={1} />
@@ -124,7 +120,7 @@ export default function Frame({ data }) {
       <CornerFlourish cx={halfW} cy={-halfH} sx={1} sy={-1} />
 
       {/* Label plaque */}
-      <group position={[0, -FRAME_H / 2 - 0.32, 0]}>
+      <group position={[0, -frameH / 2 - 0.32, 0]}>
         <mesh>
           <boxGeometry args={[1.1, 0.26, 0.04]} />
           <meshStandardMaterial
@@ -150,7 +146,7 @@ export default function Frame({ data }) {
 
       {near && (
         <Text
-          position={[0, FRAME_H / 2 + 0.28, 0]}
+          position={[0, frameH / 2 + 0.28, 0]}
           fontSize={0.09}
           color={SAFFRON}
           anchorX="center"

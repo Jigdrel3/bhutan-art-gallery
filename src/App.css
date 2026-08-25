@@ -81,45 +81,43 @@ canvas {
   width: 100%;
 }
 
-/* Uniform museum-frame treatment: outer dark wood edge, a thin gold
-   fillet, a warm mat, and a FIXED-size image window so every photo in
-   every category sits inside the same frame regardless of its own
-   aspect ratio (cropped to fill via object-fit: cover). */
+/* Museum-frame treatment: outer dark wood edge, a thin gold fillet, a
+   warm mat — all of which are just padding around the photo, so the whole
+   stack naturally hugs whatever size/shape the photo actually is. No
+   forced box, no crop, no letterbox: the frame follows the image. */
 .frame-outer {
   background: #0a0a0c;
   padding: 16px;
   border-radius: 2px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(224, 151, 47, 0.12);
+  display: inline-block;
 }
 
 .frame-fillet {
   background: linear-gradient(135deg, #e9a94a, #b9762a);
   padding: 3px;
+  display: inline-block;
 }
 
 .frame-mat {
   background: #f4f0e6;
   padding: 1.25rem;
+  display: inline-block;
 }
 
 .frame-image-box {
-  width: min(66vw, 880px);
-  height: min(58vh, 560px);
-  overflow: hidden;
-  /* Matches .frame-mat so a letterboxed gap (see object-fit below) reads
-     as mat, not a black bar cutting into the presentation. */
-  background: #f4f0e6;
+  display: block;
+  line-height: 0;
 }
 
 .frame-image-box img {
   display: block;
-  width: 100%;
-  height: 100%;
-  /* contain, not cover — a crop-to-fill was slicing real content off
-     photos whose aspect ratio didn't match the frame. The frame's outer
-     size stays fixed either way; only the photo itself now shrinks to fit
-     whole inside it, same as a real mat opening. */
-  object-fit: contain;
+  /* Natural size, just capped so a huge or tiny photo stays reasonable —
+     no cropping, no stretching, no letterbox padding to a fixed box. */
+  max-width: min(70vw, 900px);
+  max-height: min(62vh, 620px);
+  width: auto;
+  height: auto;
 }
 
 .viewer-nav {
