@@ -5,6 +5,17 @@
 --   Authentication -> Providers -> Email -> "Allow new users to sign up"
 -- With signup disabled, "authenticated" effectively means "you".
 
+-- schema.sql's read policies were scoped "to anon" only — an authenticated
+-- session is a DIFFERENT Postgres role, so without these it would have zero
+-- read access (RLS default-denies) even though it can now write.
+drop policy if exists "authenticated can read categories" on categories;
+create policy "authenticated can read categories"
+  on categories for select to authenticated using (true);
+
+drop policy if exists "authenticated can read images" on images;
+create policy "authenticated can read images"
+  on images for select to authenticated using (true);
+
 drop policy if exists "authenticated can insert categories" on categories;
 create policy "authenticated can insert categories"
   on categories for insert to authenticated with check (true);

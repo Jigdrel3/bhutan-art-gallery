@@ -26,7 +26,12 @@ export async function listCategoriesWithImages() {
 }
 
 export async function createCategory({ slug, title, wallText }) {
-  const { data: existing } = await supabase.from('categories').select('sort_order').order('sort_order', { ascending: false }).limit(1)
+  const { data: existing, error: readError } = await supabase
+    .from('categories')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  if (readError) throw readError
   const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0
   const { data, error } = await supabase
     .from('categories')
