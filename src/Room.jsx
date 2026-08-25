@@ -156,8 +156,13 @@ function FrameSpotlights({ frames }) {
       {frames.map((cat) => {
         const [px, py, pz] = cat.position
         const ry = cat.rotation[1]
-        const inX = -Math.sin(ry)
-        const inZ = -Math.cos(ry)
+        // Pull the light toward the hallway's interior. NOTE: this is the
+        // opposite sign from standingSpotFor's "forward" (which points INTO
+        // the wall, away from the room) — reusing that sign here by mistake
+        // once pushed the spotlight clean through the wall and outside the
+        // building, leaving the frame it was meant to light almost dark.
+        const inX = Math.sin(ry)
+        const inZ = Math.cos(ry)
         const inwardOffset = 2.4
         return (
           <SpotWithTarget

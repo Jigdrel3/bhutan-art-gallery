@@ -1,5 +1,6 @@
-import { useRef, useState, useMemo, useEffect } from 'react'
+import { useRef, useState, useMemo, useEffect, forwardRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { Environment, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 const prefersReducedMotion =
@@ -60,8 +61,7 @@ function FloatingClouds() {
 
 const CORNER_COLORS = [GOLD, TEAL, MAGENTA, GOLD, TEAL, MAGENTA, GOLD, TEAL]
 
-function Mass() {
-  const group = useRef(null)
+const Mass = forwardRef(function Mass(_, group) {
   const [hovered, setHovered] = useState(false)
   const corners = useMemo(() => {
     const list = []
@@ -91,11 +91,21 @@ function Mass() {
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      {/* The solid mass */}
-      <mesh castShadow>
-        <boxGeometry args={[2.1, 1.5, 1.5]} />
-        <meshStandardMaterial color={CRIMSON} emissive={CRIMSON} emissiveIntensity={0.35} roughness={0.35} metalness={0.4} />
-      </mesh>
+      {/* The solid mass — rounded edges read as a crafted object rather
+          than a flat-shaded box primitive, and the environment map is what
+          actually sells the material as something physical: without it a
+          PBR surface has nothing to reflect and looks like flat plastic. */}
+      <RoundedBox args={[2.1, 1.5, 1.5]} radius={0.09} smoothness={4} castShadow>
+        <meshPhysicalMaterial
+          color={CRIMSON}
+          emissive={CRIMSON}
+          emissiveIntensity={0.12}
+          roughness={0.32}
+          metalness={0.55}
+          clearcoat={0.6}
+          clearcoatRoughness={0.25}
+        />
+      </RoundedBox>
 
       {/* Gold edge trim — thin rods along the 4 vertical edges, plus a
           top/bottom perimeter strip, so the crimson body still reads as
@@ -108,30 +118,30 @@ function Mass() {
       ].map(([x, z], i) => (
         <mesh key={`v${i}`} position={[x, 0, z]}>
           <boxGeometry args={[0.05, 1.5, 0.05]} />
-          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.5} roughness={0.25} metalness={0.85} />
+          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
         </mesh>
       ))}
       <mesh position={[0, 0.78, 0]}>
         <boxGeometry args={[2.16, 0.04, 1.58]} />
-        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.5} roughness={0.25} metalness={0.85} />
+        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
       </mesh>
       <mesh position={[0, -0.78, 0]}>
         <boxGeometry args={[2.16, 0.04, 1.58]} />
-        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.5} roughness={0.25} metalness={0.85} />
+        <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.18} roughness={0.25} metalness={0.85} />
       </mesh>
 
       {/* Front medallion — a simple dharma-wheel-style emblem */}
       <group position={[0, 0, 0.76]}>
         <mesh>
           <torusGeometry args={[0.42, 0.045, 12, 40]} />
-          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.6} roughness={0.2} metalness={0.9} />
+          <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.22} roughness={0.2} metalness={0.9} />
         </mesh>
         {Array.from({ length: 8 }, (_, i) => {
           const a = (i / 8) * Math.PI * 2
           return (
             <mesh key={i} position={[Math.cos(a) * 0.21, Math.sin(a) * 0.21, 0]} rotation={[0, 0, a - Math.PI / 2]}>
               <cylinderGeometry args={[0.012, 0.012, 0.4, 6]} />
-              <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.4} roughness={0.3} metalness={0.8} />
+              <meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.15} roughness={0.3} metalness={0.8} />
             </mesh>
           )
         })}
@@ -144,25 +154,26 @@ function Mass() {
           <meshStandardMaterial
             color={CORNER_COLORS[i]}
             emissive={CORNER_COLORS[i]}
-            emissiveIntensity={0.9}
-            roughness={0.2}
-            metalness={0.6}
+            emissiveIntensity={0.4}
+            roughness={0.15}
+            metalness={0.5}
           />
         </mesh>
       ))}
     </group>
   )
-}
+})
 
 // Drag to orbit, scroll/pinch to zoom — a simple always-on version of the
 // same orbit-camera idea used elsewhere in the gallery, scoped to this one
 // scene since there's nothing else here to hand control back and forth to.
-function OrbitCamera({ onEnter }) {
+function OrbitCamera({ onEnter, massRef }) {
   const { camera, gl } = useThree()
   const spherical = useRef(new THREE.Spherical(6, Math.PI / 2.3, 0.4))
   const goal = useRef(new THREE.Spherical(6, Math.PI / 2.3, 0.4))
   const onEnterRef = useRef(onEnter)
   onEnterRef.current = onEnter
+  const raycaster = useRef(new THREE.Raycaster())
 
   useEffect(() => {
     const canvas = gl.domElement
@@ -172,9 +183,22 @@ function OrbitCamera({ onEnter }) {
     let pinchDist = null
     // A native `click` still fires on mouseup even after a drag, so entry
     // is gated on how far the pointer actually moved — a real drag-to-orbit
-    // shouldn't also count as "clicking the mass."
+    // shouldn't also count as "clicking the mass." It's also gated on the
+    // click actually landing on the mass, not just anywhere in the scene.
     let dragDistance = 0
     const CLICK_THRESHOLD = 6
+
+    const tryEnterAt = (clientX, clientY) => {
+      if (!massRef.current) return
+      const rect = canvas.getBoundingClientRect()
+      const ndc = new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
+      )
+      raycaster.current.setFromCamera(ndc, camera)
+      const hits = raycaster.current.intersectObject(massRef.current, true)
+      if (hits.length > 0) onEnterRef.current()
+    }
 
     const onDown = (e) => {
       dragging = true
@@ -182,9 +206,9 @@ function OrbitCamera({ onEnter }) {
       lastX = e.clientX
       lastY = e.clientY
     }
-    const onUp = () => {
+    const onUp = (e) => {
       dragging = false
-      if (dragDistance < CLICK_THRESHOLD) onEnterRef.current()
+      if (dragDistance < CLICK_THRESHOLD) tryEnterAt(e.clientX, e.clientY)
     }
     const onMove = (e) => {
       if (!dragging) return
@@ -232,7 +256,7 @@ function OrbitCamera({ onEnter }) {
       const wasDragging = dragging
       dragging = false
       pinchDist = null
-      if (wasDragging && dragDistance < CLICK_THRESHOLD) onEnterRef.current()
+      if (wasDragging && dragDistance < CLICK_THRESHOLD) tryEnterAt(lastX, lastY)
     }
 
     canvas.addEventListener('mousedown', onDown)
@@ -252,7 +276,7 @@ function OrbitCamera({ onEnter }) {
       canvas.removeEventListener('touchmove', onTouchMove)
       canvas.removeEventListener('touchend', onTouchEnd)
     }
-  }, [gl])
+  }, [gl, camera, massRef])
 
   useFrame((_, delta) => {
     const damp = Math.min(1, delta * 6)
@@ -270,10 +294,18 @@ function OrbitCamera({ onEnter }) {
 }
 
 export default function EntranceScene({ onEnter }) {
+  const massRef = useRef(null)
+
   return (
     <>
       <color attach="background" args={['#1a0a2e']} />
       <fog attach="fog" args={['#1a0a2e', 7, 15]} />
+
+      {/* Reflections are what make PBR materials read as real instead of
+          flat-shaded plastic — without an environment map to reflect,
+          metalness/clearcoat have nothing to show. Lighting-only (no
+          skybox), so it doesn't fight the void background/fog above. */}
+      <Environment preset="sunset" />
 
       <ambientLight intensity={0.35} color="#6a4fa0" />
       <pointLight position={[3.5, 2.5, 3]} color={TEAL} intensity={55} distance={13} decay={1.8} />
@@ -281,9 +313,9 @@ export default function EntranceScene({ onEnter }) {
       <pointLight position={[0, -2.5, 3.5]} color={MAGENTA} intensity={40} distance={11} decay={2} />
       <pointLight position={[0, 3, -3]} color={GOLD} intensity={20} distance={9} decay={2} />
 
-      <Mass />
+      <Mass ref={massRef} />
       <FloatingClouds />
-      <OrbitCamera onEnter={onEnter} />
+      <OrbitCamera onEnter={onEnter} massRef={massRef} />
     </>
   )
 }
