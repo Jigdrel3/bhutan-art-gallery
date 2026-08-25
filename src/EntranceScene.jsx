@@ -3,7 +3,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Environment, Float } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { getMandalaTextures } from './lib/mandalaTexture'
 
 const prefersReducedMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -11,8 +10,8 @@ const prefersReducedMotion =
 const VOID = '#0a0908'
 const MIST = '#3a3128'
 const SAFFRON = '#e8a33d'
+const GOLD_BRIGHT = '#f2c368'
 const MAROON = '#7a1f2b'
-const GLASS_TINT = '#f4ead2'
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3)
@@ -21,21 +20,113 @@ function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-// The etched glow edge — a separate emissive mesh (not just a material
+// The glowing core — a separate emissive mesh (not just a material
 // property) so bloom has real geometry to bleed light from, matching the
-// reference image's "light escaping a shrine interior" edge.
-const GlowEdge = forwardRef(function GlowEdge({ baseIntensity }, ref) {
+// reference image's "light escaping a shrine interior" effect.
+const GlowHub = forwardRef(function GlowHub({ baseIntensity }, ref) {
   return (
-    <mesh ref={ref} position={[0.86, 0, 0]}>
-      <boxGeometry args={[0.05, 2.05, 1.25]} />
-      <meshStandardMaterial color={SAFFRON} emissive={SAFFRON} emissiveIntensity={baseIntensity} toneMapped={false} />
+    <mesh ref={ref} position={[0, 0, 0.16]}>
+      <icosahedronGeometry args={[0.22, 1]} />
+      <meshStandardMaterial
+        color={GOLD_BRIGHT}
+        emissive={SAFFRON}
+        emissiveIntensity={baseIntensity}
+        toneMapped={false}
+        metalness={0.5}
+        roughness={0.2}
+      />
     </mesh>
   )
 })
 
+// A single ring, given real depth via its torus tube thickness.
+function Ring({ radius, tube, z, color = SAFFRON }) {
+  return (
+    <mesh position={[0, 0, z]}>
+      <torusGeometry args={[radius, tube, 16, 64]} />
+      <meshStandardMaterial color={color} metalness={0.85} roughness={0.26} />
+    </mesh>
+  )
+}
+
+// A petal as an actual volumetric form (a stretched sphere), not a flat
+// decal — it has real thickness and catches light differently from every
+// angle as the piece rotates, which is what makes it read as 3D.
+function Petal({ angle, radius, z, length, width, thickness, color }) {
+  return (
+    <mesh
+      position={[Math.cos(angle) * radius, Math.sin(angle) * radius, z]}
+      rotation={[0, 0, angle - Math.PI / 2]}
+      scale={[width, length, thickness]}
+    >
+      <sphereGeometry args={[1, 12, 8]} />
+      <meshStandardMaterial color={color} metalness={0.8} roughness={0.3} />
+    </mesh>
+  )
+}
+
+function PetalRing({ radius, count, z, length, width, thickness, color, accentColor }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => {
+        const angle = (i / count) * Math.PI * 2
+        const useAccent = accentColor && i % 4 === 0
+        return (
+          <Petal
+            key={i}
+            angle={angle}
+            radius={radius}
+            z={z}
+            length={length}
+            width={width}
+            thickness={thickness}
+            color={useAccent ? accentColor : color}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+// A radial spoke connecting two rings — real cylindrical geometry, not a
+// flat line, so it has presence when viewed edge-on as the piece turns.
+function Spoke({ angle, innerR, outerR, z, color = SAFFRON }) {
+  const len = outerR - innerR
+  const midR = (innerR + outerR) / 2
+  return (
+    <mesh position={[Math.cos(angle) * midR, Math.sin(angle) * midR, z]} rotation={[0, 0, angle - Math.PI / 2]}>
+      <cylinderGeometry args={[0.018, 0.018, len, 6]} />
+      <meshStandardMaterial color={color} metalness={0.85} roughness={0.24} />
+    </mesh>
+  )
+}
+
+function SpokeRing({ count, innerR, outerR, z, color }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <Spoke key={i} angle={(i / count) * Math.PI * 2} innerR={innerR} outerR={outerR} z={z} color={color} />
+      ))}
+    </>
+  )
+}
+
+function Gem({ angle, radius, z, color }) {
+  return (
+    <mesh position={[Math.cos(angle) * radius, Math.sin(angle) * radius, z]}>
+      <octahedronGeometry args={[0.05]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.45} metalness={0.6} roughness={0.15} />
+    </mesh>
+  )
+}
+
+// The mandala itself — genuinely three-dimensional: concentric rings with
+// real torus thickness, petals with real volume, spokes with real
+// cylindrical form, layered at different depths so it reads as a
+// dimensional wheel from any angle, not a flat pattern glued to a surface.
 const MandalaGate = forwardRef(function MandalaGate({ hover, glowRef, activatingRef }, ref) {
-  const { normalMap, emissiveMap } = useMemo(() => getMandalaTextures(SAFFRON), [])
   const hoverT = useRef(0)
+  const outerGemCount = 16
 
   useFrame((_, delta) => {
     // While the click-activation sequence is running, HeroCamera owns the
@@ -49,88 +140,41 @@ const MandalaGate = forwardRef(function MandalaGate({ hover, glowRef, activating
     const eased = easeOutCubic(hoverT.current)
 
     if (glowRef.current) {
-      glowRef.current.material.emissiveIntensity = THREE.MathUtils.lerp(1.4, 2.0, eased)
+      glowRef.current.material.emissiveIntensity = THREE.MathUtils.lerp(1.6, 2.4, eased)
     }
     if (ref.current) {
-      const s = THREE.MathUtils.lerp(1, 1.03, eased)
+      const s = THREE.MathUtils.lerp(1, 1.04, eased)
       ref.current.scale.set(s, s, s)
     }
   })
 
   return (
     <group ref={ref}>
-      {/* Glass body — proportioned closer to a gau (portable shrine box)
-          than a plain cube: taller than it is wide, modest depth. Plain
-          tinted glass, no pattern here — a box's 6 faces don't share a
-          uniform square aspect, so mapping a circular mandala across all
-          of them via shared UVs stretched it into something unrecognizable
-          on the non-square faces. The mandala lives on its own square
-          medallion panel below instead, where it can't distort. */}
-      <mesh castShadow>
-        <boxGeometry args={[1.7, 2.1, 1.3]} />
-        <meshPhysicalMaterial
-          color={GLASS_TINT}
-          transmission={0.92}
-          roughness={0.08}
-          ior={1.5}
-          thickness={0.6}
-          attenuationColor={GLASS_TINT}
-          attenuationDistance={1.2}
-          clearcoat={0.4}
-          clearcoatRoughness={0.2}
-        />
-      </mesh>
+      <Ring radius={1.55} tube={0.045} z={-0.14} />
+      <PetalRing
+        radius={1.32}
+        count={16}
+        z={-0.07}
+        length={0.34}
+        width={0.13}
+        thickness={0.07}
+        color={SAFFRON}
+        accentColor={MAROON}
+      />
+      <SpokeRing count={16} innerR={1.02} outerR={1.5} z={-0.1} color={SAFFRON} />
 
-      {/* Mandala medallion — a square glass panel set into the front face,
-          so the etched pattern renders at its true undistorted proportions
-          and is unmistakably a mandala rather than a stretched smear. */}
-      <mesh position={[0, 0, 0.68]}>
-        <planeGeometry args={[1.35, 1.35]} />
-        <meshPhysicalMaterial
-          color={GLASS_TINT}
-          transmission={0.55}
-          roughness={0.06}
-          ior={1.5}
-          thickness={0.25}
-          normalMap={normalMap}
-          normalScale={new THREE.Vector2(1.1, 1.1)}
-          emissiveMap={emissiveMap}
-          emissive={SAFFRON}
-          emissiveIntensity={1.6}
-          toneMapped={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+      <Ring radius={1.0} tube={0.05} z={0} color={GOLD_BRIGHT} />
 
-      {/* Gold structural frame */}
-      {[
-        [0.87, 1.05, 0.67],
-        [0.87, 1.05, -0.67],
-        [-0.87, 1.05, 0.67],
-        [-0.87, 1.05, -0.67],
-      ].map(([x, , z], i) => (
-        <mesh key={i} position={[x, 0, z]}>
-          <boxGeometry args={[0.045, 2.1, 0.045]} />
-          <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
-        </mesh>
+      <PetalRing radius={0.75} count={12} z={0.06} length={0.28} width={0.11} thickness={0.06} color={GOLD_BRIGHT} />
+      <SpokeRing count={8} innerR={0.24} outerR={0.68} z={0.08} color={SAFFRON} />
+
+      <Ring radius={0.42} tube={0.035} z={0.12} color={SAFFRON} />
+
+      {Array.from({ length: outerGemCount }, (_, i) => (
+        <Gem key={i} angle={(i / outerGemCount) * Math.PI * 2} radius={1.32} z={-0.02} color={MAROON} />
       ))}
-      <mesh position={[0, 1.08, 0]}>
-        <boxGeometry args={[1.76, 0.04, 1.36]} />
-        <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
-      </mesh>
-      <mesh position={[0, -1.08, 0]}>
-        <boxGeometry args={[1.76, 0.04, 1.36]} />
-        <meshStandardMaterial color={SAFFRON} roughness={0.28} metalness={0.9} />
-      </mesh>
 
-      {/* Base plinth — a quiet nod to a shrine's plinth rather than the
-          object simply floating with no grounding form at all */}
-      <mesh position={[0, -1.24, 0]}>
-        <boxGeometry args={[1.95, 0.14, 1.55]} />
-        <meshStandardMaterial color="#1c1712" roughness={0.6} metalness={0.3} />
-      </mesh>
-
-      <GlowEdge ref={glowRef} baseIntensity={1.4} />
+      <GlowHub ref={glowRef} baseIntensity={1.6} />
     </group>
   )
 })
