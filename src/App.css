@@ -24,14 +24,21 @@ canvas {
   text-align: center;
 }
 
+/* Anchored low and kept small on purpose — this is a passive reminder,
+   not a gate the visitor has to click through or read before moving. */
+.hint {
+  justify-content: flex-end;
+  padding-bottom: 4vh;
+}
+
 .hint p {
-  margin: 0.25em 0;
+  margin: 0;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
 .hint-sub {
-  font-size: 0.85rem;
-  opacity: 0.7;
+  font-size: 0.75rem;
+  opacity: 0.55;
   font-family: system-ui, sans-serif;
   letter-spacing: 0.02em;
 }

@@ -49,7 +49,7 @@ export default function CategoryViewer({ category, onClose }) {
               <div className="frame-image-box">
                 <img
                   key={current.url}
-                  src={transformedImageUrl(current.url, { width: 1400, quality: 82 })}
+                  src={transformedImageUrl(current.url, { width: 1600, quality: 88 })}
                   alt={altText}
                 />
               </div>

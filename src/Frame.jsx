@@ -12,6 +12,27 @@ const MAT_BORDER = 0.12
 const FILLET = 0.03
 const SAFFRON = '#e0972f'
 
+// Crops the texture to fill the target aspect ratio (like CSS
+// object-fit: cover) instead of letting a plain UV-mapped plane stretch
+// whatever aspect ratio the source photo happens to be into the frame's
+// fixed shape — that stretching is what was reading as "distorted."
+function fitTextureCover(texture, targetAspect) {
+  const img = texture.image
+  if (!img || !img.width || !img.height) return
+  const imgAspect = img.width / img.height
+  if (imgAspect > targetAspect) {
+    const scale = targetAspect / imgAspect
+    texture.repeat.set(scale, 1)
+    texture.offset.set((1 - scale) / 2, 0)
+  } else {
+    const scale = imgAspect / targetAspect
+    texture.repeat.set(1, scale)
+    texture.offset.set(0, (1 - scale) / 2)
+  }
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
+  texture.needsUpdate = true
+}
+
 // A small L-shaped bracket at one mat corner, opening toward the center —
 // the museum-label flourish, kept small and restrained.
 function CornerFlourish({ cx, cy, sx, sy }) {
@@ -32,7 +53,7 @@ function CornerFlourish({ cx, cy, sx, sy }) {
 }
 
 export default function Frame({ data }) {
-  const texture = useTexture(transformedImageUrl(data.cover, { width: 512 }))
+  const texture = useTexture(transformedImageUrl(data.cover, { width: 900, quality: 85 }))
   const { gl } = useThree()
   const matRef = useRef(null)
   const plaqueMatRef = useRef(null)
@@ -41,7 +62,7 @@ export default function Frame({ data }) {
   useEffect(() => {
     texture.anisotropy = gl.capabilities.getMaxAnisotropy()
     texture.colorSpace = THREE.SRGBColorSpace
-    texture.needsUpdate = true
+    fitTextureCover(texture, FRAME_W / FRAME_H)
   }, [texture, gl])
 
   useFrame(({ camera }) => {

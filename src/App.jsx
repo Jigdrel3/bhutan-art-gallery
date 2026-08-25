@@ -109,10 +109,7 @@ export default function App() {
 
       {!loadingCategories && !locked && !entered && (
         <div className="overlay hint">
-          <p>Click anywhere to step inside</p>
-          <p className="hint-sub">
-            WASD to walk &middot; mouse to look around &middot; stand on a glowing marker and click (or press E) to enter a room &middot; Esc to step back
-          </p>
+          <p className="hint-sub">Click to walk &middot; WASD &amp; mouse &middot; E to enter a room</p>
         </div>
       )}
 
